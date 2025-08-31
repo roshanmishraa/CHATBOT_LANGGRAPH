@@ -1,0 +1,30 @@
+# Environment files
+.env
+*.env
+
+# Virtual environment
+chatbot_env/
+venv/
+env/
+.venv/
+ENV/
+.ENV/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.so
+
+# SQLite database files
+*.db
+*.sqlite3
+
+# VS Code settings
+.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# System files
+.DS_Store
+Thumbs.db
