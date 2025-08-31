@@ -10,9 +10,12 @@ import os
 # Load API key
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
-print("Loaded API Key:", api_key)
+if not api_key:
+    raise ValueError("❌ GOOGLE_API_KEY not found in .env file")
 
-# Config required by LangGraph checkpointer
+print("✅ Loaded API Key")
+
+# Config required by LangGraph checkpointer (thread/session id)
 CONFIG = {
     "configurable": {
         "thread_id": "thread-1"
@@ -25,53 +28,49 @@ llm = ChatGoogleGenerativeAI(
     google_api_key=api_key
 )
 
-# Conversation state
+# Define conversation state
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
 # Node function
 def chat_node(state: ChatState):
-    # Flatten messages to a single list of BaseMessage
-    flat_messages = []
-    for m in state['messages']:
-        if isinstance(m, (list, tuple)):
-            for x in m:
-                if isinstance(x, BaseMessage):
-                    flat_messages.append(x)
-        elif isinstance(m, BaseMessage):
-            flat_messages.append(m)
+    messages = state.get("messages", [])
+    
+    if not messages:
+        messages = [HumanMessage(content="Hello!")]
 
-    # Default message if empty
-    if not flat_messages:
-        flat_messages = [HumanMessage(content="Hello!")]
+    print(f"📩 User said: {messages[-1].content}")
 
-    # Call Gemini 2.5 Pro
-    response = llm.generate(flat_messages)
+    try:
+        response = llm.invoke(messages)
+        ai_text = getattr(response, "content", "🤖 Sorry, no response.")
+    except Exception as e:
+        ai_text = f"⚠️ Error: {str(e)}"
 
-    # Safely extract text
-    ai_text = response.generations[0][0].text if response.generations else "🤖 Sorry, no response."
-
-    # Return as AIMessage list
+    print(f"🤖 Gemini replied: {ai_text}")
     return {"messages": [AIMessage(content=ai_text)]}
 
-# Checkpointer
+# Checkpointer (stores history in memory)
 checkpointer = InMemorySaver()
 
 # Graph workflow
-graph = StateGraph(ChatState, config=CONFIG)  # <-- Pass CONFIG here
+graph = StateGraph(ChatState)
 graph.add_node("chat_node", chat_node)
 graph.add_edge(START, "chat_node")
 graph.add_edge("chat_node", END)
 
-# Compile chatbot with checkpointer
+# Compile chatbot
 chatbot = graph.compile(checkpointer=checkpointer)
-print("Chatbot compiled successfully!")
+print("✅ Chatbot compiled successfully!")
 
 # Standalone test
 if __name__ == "__main__":
     test_response = chatbot.invoke(
-        {"messages": [HumanMessage(content="Hello Gemini!") ]},
-        config=CONFIG  # <-- Pass CONFIG here too
+        {"messages": [HumanMessage(content="Hello Gemini!")]},
+        config=CONFIG
     )
-    print("Response:", test_response["messages"][-1].content)
+
+
+
+
 
